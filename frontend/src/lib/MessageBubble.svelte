@@ -1,7 +1,10 @@
 <script>
-    export let message; // { role: 'user' | 'model', content, type, data, sql }
+    import { createEventDispatcher } from "svelte";
     import { slide } from "svelte/transition";
 
+    export let message; // { role: 'user' | 'model', content, type, data, sql }
+
+    const dispatch = createEventDispatcher();
     let showSql = false;
 </script>
 
@@ -72,7 +75,7 @@
                             {message.content}
                         </p>
                         <div
-                            class="bg-amber-50 border border-amber-100 rounded-lg p-3"
+                            class="bg-amber-50 border border-amber-100 rounded-lg p-3 mb-4"
                         >
                             <p
                                 class="text-xs font-mono text-amber-800 break-all"
@@ -80,9 +83,14 @@
                                 {message.sql}
                             </p>
                         </div>
-                        <!-- Event dispatcher usually handled by parent, but here we just show state -->
-                        <!-- The button is actually in ChatInterface for logic reasons, 
-                  but ideally should be here or emitted. We'll handle it in ChatInterface for now. -->
+
+                        <!-- Button In-Flow -->
+                        <button
+                            on:click={() => dispatch("proceed", message.sql)}
+                            class="w-full py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"
+                        >
+                            <span>🚀 Proceed</span>
+                        </button>
                     </div>
 
                     <!-- 4. Default Text -->
@@ -96,7 +104,6 @@
 
                 <!-- SQL Footer (Collapsible) -->
                 {#if message.sql && message.type !== "plan"}
-                    <!-- Don't show twice for plan -->
                     <div class="bg-gray-50 px-4 py-2 border-t border-gray-100">
                         <button
                             on:click={() => (showSql = !showSql)}

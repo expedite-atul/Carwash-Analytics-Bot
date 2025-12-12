@@ -61,15 +61,52 @@ npm run dev
 ```
 Visit `http://localhost:5173` to access the dashboard.
 
-## 🧠 Architecture
-1.  **User asks question** -> FastAPI Endpoint
-2.  **Agent Logic (`agent.py`)**:
-    *   (Optional) Searches `pgvector` for similar past queries (RAG).
-    *   Prompts Gemini with Schema + Examples.
-    *   Returns a **Plan** (SQL + Explanation).
-3.  **User approves logic**.
-4.  **Agent executes SQL** on Postgres (Read-Only).
-5.  **Smart Formatting**: Results are returned as KPI, Table, or Text.
+## 🧠 Architecture (RAG Flow)
+This system uses a **Provider-Agnostic** design. By default, it uses **Local Embeddings** (Free/Fast) and **Gemini Flash** (Smart/Cheap).
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant UI as Svelte Frontend
+    participant API as FastAPI Backend
+    participant VS as PGVector (Local DB)
+    participant HF as HuggingFace (Local CPU)
+    participant LLM as Gemini API
+
+    User->>UI: "How many customers?"
+    UI->>API: POST /chat/plan
+    
+    rect rgb(240, 248, 255)
+        Note over API, VS: RAG Memory Retrieval
+        API->>HF: Embed Query (Local Model)
+        HF-->>API: Vector [0.12, -0.4...]
+        API->>VS: SELECT lowest cosine distance
+        VS-->>API: Similar Past SQL Examples
+    end
+
+    rect rgb(255, 240, 245)
+        Note over API, LLM: Generation
+        API->>LLM: Prompt (Schema + RAG Examples + Query)
+        LLM-->>API: Generated SQL Plan
+    end
+
+    API-->>UI: Return Plan (Explanation + SQL)
+    
+    User->>UI: Click "Proceed"
+    UI->>API: POST /chat/execute
+    API->>VS: Execute SQL (Read-Only)
+    VS-->>API: Raw Rows
+    API-->>UI: JSON (KPI or Table)
+    UI-->>User: Render Smart Card
+```
+
+## 🛠 Tech Stack
+*   **Backend**: FastAPI, LangChain
+*   **LLM Provider**: Google Gemini 2.5 Flash (Pluggable)
+*   **Memory/Embeddings**: **Local HuggingFace** (`all-MiniLM-L6-v2`) or Google API.
+*   **Database**: PostgreSQL 16 + `pgvector`
+*   **Frontend**: Svelte 5, TailwindCSS
+
 
 ## 📝 License
 MIT

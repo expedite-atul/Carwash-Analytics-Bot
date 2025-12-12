@@ -104,18 +104,11 @@
   <div class="flex-1 overflow-y-auto p-6 scroll-smooth">
     {#each messages as msg}
       <div class="relative group">
-        <MessageBubble message={msg} />
-
-        {#if msg.type === "plan"}
-          <div class="absolute bottom-6 left-5">
-            <button
-              on:click={() => confirmExecution(msg.sql)}
-              class="ml-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg shadow-lg hover:bg-indigo-700 transition-all transform hover:scale-105 flex items-center gap-2"
-            >
-              <span>🚀 Proceed</span>
-            </button>
-          </div>
-        {/if}
+        <!-- Handle 'proceed' event from the bubble -->
+        <MessageBubble
+          message={msg}
+          on:proceed={(e) => confirmExecution(e.detail)}
+        />
       </div>
     {/each}
 
