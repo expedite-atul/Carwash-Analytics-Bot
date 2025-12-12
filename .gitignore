@@ -1,0 +1,23 @@
+# Environment Variables
+.env
+backend/.env
+
+# Dependencies
+node_modules/
+venv/
+env/
+__pycache__/
+*.pyc
+
+# Database
+db_dump/
+*.sql
+*.sqlite3
+
+# OS / Editor
+.DS_Store
+.vscode/
+.idea/
+
+# Build
+frontend/dist/
