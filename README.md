@@ -23,43 +23,72 @@ A RAG-enhanced Business Intelligence bot that allows carwash owners to query the
 
 ## 🚀 Getting Started
 
-### Prerequisites
-*   Docker & Docker Compose
-*   Node.js 18+
-*   Python 3.10+
-*   Google Gemini API Key
+### 📋 Prerequisites
+Before you begin, ensure you have the following installed:
+1.  **Docker & Docker Compose**: For running the database.
+2.  **Node.js (v18+) & npm**: For the Svelte frontend.
+3.  **Python (v3.10+)**: For the FastAPI backend.
+4.  **Google Gemini API Key**: (Optional, if using Cloud LLM).
 
-### 1. Database Setup
-Start the local PostgreSQL instance with pgvector:
+### ⚙️ Installation & Running
+
+#### 1. Database Setup
+Start the local PostgreSQL instance with pgvector.
 ```bash
+# Copy the example environment file
+cp .env.example .env
+
+# Start the database container
 docker-compose up -d
 ```
-*Port mapping: Host `5433` -> Container `5432` (to avoid conflicts).*
+*Note: This runs Postgres on port **5433** to avoid conflicts with any local Postgres you might have.*
 
-### 2. Backend Setup
+#### 2. Backend Setup
+Set up the Python environment and start the API.
 ```bash
 cd backend
+
+# Create and activate virtual environment
 python -m venv venv
-source venv/bin/activate
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
 pip install -r requirements.txt
 
-# Configure Secrets
+# Configure Environment
 cp .env.example .env
-# Edit .env and add your GOOGLE_API_KEY
+# Edit .env to set your API Keys (GOOGLE_API_KEY) and Providers
 ```
 
 Run the server:
 ```bash
 uvicorn app.main:app --reload --port 8000
 ```
+*The API will be available at `http://localhost:8000`.*
 
-### 3. Frontend Setup
+#### 3. Frontend Setup
+Launch the Svelte dashboard.
 ```bash
 cd frontend
+
+# Install dependencies
 npm install
+
+# Start development server
 npm run dev
 ```
-Visit `http://localhost:5173` to access the dashboard.
+Open your browser and visit **`http://localhost:5173`**.
+
+---
+
+## 🔧 Configuration (.env)
+You can configure the AI providers in `backend/.env`:
+
+| Variable | Options | Description |
+| :--- | :--- | :--- |
+| `LLM_PROVIDER` | `gemini` | The Brain. Currently supports Google Gemini. |
+| `EMBEDDING_PROVIDER` | `local`, `google` | The Memory. Use `local` for free, private embeddings. |
+
 
 ## 🧠 Architecture (RAG Flow)
 This system uses a **Provider-Agnostic** design. By default, it uses **Local Embeddings** (Free/Fast) and **Gemini Flash** (Smart/Cheap).
