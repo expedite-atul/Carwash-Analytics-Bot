@@ -9,3 +9,4 @@ langchain-google-genai
 langchain-experimental
 # For Postgres connection
 psycopg2-binary
+sentence-transformers

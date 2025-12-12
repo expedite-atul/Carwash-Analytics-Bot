@@ -12,6 +12,8 @@
   let input = "";
   let isLoading = false;
 
+  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
   async function sendMessage(text = input) {
     if (!text || !text.trim()) return;
 
