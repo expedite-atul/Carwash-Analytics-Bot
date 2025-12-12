@@ -1,6 +1,7 @@
 <script>
     import { createEventDispatcher } from "svelte";
     import { slide } from "svelte/transition";
+    import ChartRenderer from "./ChartRenderer.svelte";
 
     export let message; // { role: 'user' | 'model', content, type, data, sql }
 
@@ -40,7 +41,21 @@
                         </p>
                     </div>
 
-                    <!-- 2. Table Mode -->
+                    <!-- 2. Chart Mode -->
+                {:else if message.type === "chart"}
+                    <div class="p-4 w-full h-[300px]">
+                        <p
+                            class="text-xs font-semibold text-muted mb-2 text-center uppercase tracking-wider"
+                        >
+                            Visualization
+                        </p>
+                        <ChartRenderer
+                            data={message.data}
+                            type={message.chartType}
+                        />
+                    </div>
+
+                    <!-- 3. Table Mode -->
                 {:else if message.type === "table"}
                     <div class="overflow-x-auto">
                         <table class="w-full text-sm text-left">
@@ -121,6 +136,22 @@
                                 {message.sql}
                             </div>
                         {/if}
+                    </div>
+                {/if}
+
+                <!-- Feedback Actions -->
+                {#if message.role === "model" && message.type !== "plan" && message.sql}
+                    <div
+                        class="flex justify-end p-2 px-4 border-t border-gray-50"
+                    >
+                        <button
+                            on:click={() =>
+                                dispatch("feedback", { sql: message.sql })}
+                            class="text-xs flex items-center gap-1 text-gray-400 hover:text-green-600 transition-colors"
+                            title="Help me learn! Mark this as a good answer."
+                        >
+                            👍 Great Answer
+                        </button>
                     </div>
                 {/if}
             </div>

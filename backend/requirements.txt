@@ -10,3 +10,8 @@ langchain-experimental
 # For Postgres connection
 psycopg2-binary
 sentence-transformers
+
+redis
+passlib[bcrypt]
+python-jose[cryptography]
+python-multipart

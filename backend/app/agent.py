@@ -1,7 +1,8 @@
 import os
 import json
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
-from langchain_community.embeddings import HuggingFaceEmbeddings
+# from langchain_community.embeddings import HuggingFaceEmbeddings # DEPRECATED
+from langchain_huggingface import HuggingFaceEmbeddings
 # To support OpenAI/Claude in future, import their classes here e.g.:
 # from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 # from langchain_anthropic import ChatAnthropic
@@ -11,6 +12,7 @@ from langchain_core.prompts import PromptTemplate
 from dotenv import load_dotenv
 from sqlalchemy import text
 from .db import engine
+import re
 
 load_dotenv()
 
@@ -72,23 +74,26 @@ def seed_golden_queries():
         # For now, we assume the user clears the table if switching providers, or we handle migration.
         
         # Detect dimensions
-        sample_vec = embeddings.embed_query("test")
-        dim = len(sample_vec)
-        
-        conn.execute(text(f"CREATE TABLE IF NOT EXISTS golden_queries (id SERIAL PRIMARY KEY, question TEXT, sql_query TEXT, embedding vector({dim}));"))
-        
-        # Check if empty
-        result = conn.execute(text("SELECT count(*) FROM golden_queries")).scalar()
-        if result == 0:
-            print(f"🌱 Seeding Golden Queries using {EMBEDDING_PROVIDER} (dim={dim})...")
-            for q, sql in INITIAL_GOLDEN_QUERIES:
-                vector = embeddings.embed_query(q)
-                conn.execute(
-                    text("INSERT INTO golden_queries (question, sql_query, embedding) VALUES (:q, :sql, :vec)"),
-                    {"q": q, "sql": sql, "vec": str(vector)}
-                )
-            conn.commit()
-            print("✅ Seeding Complete.")
+        try:
+            sample_vec = embeddings.embed_query("test")
+            dim = len(sample_vec)
+            
+            conn.execute(text(f"CREATE TABLE IF NOT EXISTS golden_queries (id SERIAL PRIMARY KEY, question TEXT, sql_query TEXT, embedding vector({dim}));"))
+            
+            # Check if empty
+            result = conn.execute(text("SELECT count(*) FROM golden_queries")).scalar()
+            if result == 0:
+                print(f"🌱 Seeding Golden Queries using {EMBEDDING_PROVIDER} (dim={dim})...")
+                for q, sql in INITIAL_GOLDEN_QUERIES:
+                    vector = embeddings.embed_query(q)
+                    conn.execute(
+                        text("INSERT INTO golden_queries (question, sql_query, embedding) VALUES (:q, :sql, :vec)"),
+                        {"q": q, "sql": sql, "vec": str(vector)}
+                    )
+                conn.commit()
+                print("✅ Seeding Complete.")
+        except Exception as e:
+            print(f"⚠️ Seed Error: {e}")
 
 # Run seed on startup
 try:
@@ -117,7 +122,22 @@ def get_similar_examples(question: str, k=2):
         print(f"❌ Vector Search Error: {e}")
         return ""
 
-# --- Agent Logic ---
+def add_golden_query(question: str, sql_query: str):
+    """Adds a new verified Q/SQL pair to the vector store."""
+    try:
+        vector = embeddings.embed_query(question)
+        with engine.connect() as conn:
+            conn.execute(
+                text("INSERT INTO golden_queries (question, sql_query, embedding) VALUES (:q, :sql, :vec)"),
+                {"q": question, "sql": sql_query, "vec": str(vector)}
+            )
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"❌ Failed to add golden query: {e}")
+        return False
+
+# ... (Agent Logic)
 
 template = """You are a Postgres expert. Given an input question, create a syntactically correct PostgreSQL query to run.
 Use the schema and the "Similar Examples" below to guide your answer.
@@ -167,11 +187,19 @@ def process_user_question(question: str):
             "explanation": f"I found some similar past queries to help me. I will query the 'customer' table."
         }
     except Exception as e:
+        error_str = str(e)
+        if "RESOURCE_EXHAUSTED" in error_str or "429" in error_str:
+            return {
+                "status": "error",
+                "message": "⚠️ AI Overload: The free tier quota has been exceeded. Please wait ~30 seconds and try again."
+            }
+        print(f"❌ AI Error: {e}")
         return {
             "status": "error",
-            "message": str(e)
+            "message": f"AI Error: {str(e)}"
         }
 
+# Execute function remains unchanged...
 # Execute function remains unchanged...
 def execute_approved_sql(sql_query: str):
     try:
@@ -181,10 +209,47 @@ def execute_approved_sql(sql_query: str):
             columns = list(result.keys())
             data = [dict(zip(columns, row)) for row in rows]
             
+            # 1. Single Value -> KPI
             if len(rows) == 1 and len(columns) == 1:
                 val = rows[0][0]
                 if isinstance(val, (int, float)):
                     return {"status": "success", "type": "kpi", "data": {"value": val, "label": columns[0], "sql": sql_query}}
+
+            # 2. Heuristic for Charts: 
+            # If 2 columns, and one is numeric and other is string/date -> Bar Chart
+            if len(columns) == 2 and len(rows) > 1:
+                col1, col2 = columns[0], columns[1]
+                # Check types of first row
+                val1, val2 = rows[0][0], rows[0][1]
+                
+                is_num1 = isinstance(val1, (int, float))
+                is_num2 = isinstance(val2, (int, float))
+                
+                if is_num1 != is_num2: # Exactly one is numeric
+                    # Identify inputs
+                    label_key = col1 if not is_num1 else col2
+                    value_key = col1 if is_num1 else col2
+                    
+                    # Heuristic: If label looks like Date, use Line Chart
+                    import datetime
+                    first_label = data[0][label_key]
+                    is_date = isinstance(first_label, (datetime.date, datetime.datetime))
+                    
+                    chart_type = "line" if is_date else "bar"
+                    
+                    return {
+                        "status": "success", 
+                        "type": "chart", 
+                        "chartType": chart_type,
+                        "data": {
+                            "labels": [r[label_key] for r in data],
+                            "datasets": [{
+                                "label": value_key,
+                                "data": [r[value_key] for r in data]
+                            }],
+                            "sql": sql_query
+                        }
+                    }
 
             return {"status": "success", "type": "table", "data": {"columns": list(columns), "rows": data, "sql": sql_query}}
 

@@ -127,6 +127,15 @@ sequenceDiagram
     VS-->>API: Raw Rows
     API-->>UI: JSON (KPI or Table)
     UI-->>User: Render Smart Card
+
+    opt Feedback Loop (Self-Learning)
+        User->>UI: Click "Thumbs Up"
+        UI->>API: POST /chat/feedback
+        API->>HF: Embed (Question + Approved SQL)
+        HF-->>API: New Vector
+        API->>VS: INSERT INTO golden_queries
+        Note right of VS: System learns this query<br/>for future retrieval!
+    end
 ```
 
 ## 🛠 Tech Stack

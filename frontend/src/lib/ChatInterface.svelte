@@ -1,16 +1,35 @@
 <script>
-  import SuggestionChips from "./SuggestionChips.svelte";
+  import { afterUpdate, onMount } from "svelte";
   import MessageBubble from "./MessageBubble.svelte";
+  import SuggestionChips from "./SuggestionChips.svelte";
+  import { token } from "../stores/auth"; // Import Token Store
 
   let messages = [
     {
-      role: "model",
+      role: "bot",
       content:
-        "Hello! I am your Carwash Analytics Assistant. Ask me a question or pick a quick action.",
+        "Hello! I'm your Analytics Assistant. Ask me about revenue, customers, or churn.",
     },
   ];
   let input = "";
   let isLoading = false;
+  let authToken = "";
+
+  token.subscribe((val) => (authToken = val));
+
+  onMount(async () => {
+    try {
+      const res = await fetch(`${API_URL}/chat/history`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      const history = await res.json();
+      if (history && history.length > 0) {
+        messages = history;
+      }
+    } catch (e) {
+      console.error("Failed to load history", e);
+    }
+  });
 
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -24,9 +43,12 @@
 
     try {
       // Step 1: Get the Plan (SQL)
-      const res = await fetch("http://localhost:8000/chat/plan", {
+      const res = await fetch(`${API_URL}/chat/plan`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`, // Secure Call
+        },
         body: JSON.stringify({ message: text }),
       });
       const data = await res.json();
@@ -61,10 +83,14 @@
   async function confirmExecution(sql) {
     isLoading = true;
     try {
-      const res = await fetch("http://localhost:8000/chat/execute", {
+      // Step 2: Execute
+      const res = await fetch(`${API_URL}/chat/execute`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sql: sql }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({ sql }),
       });
       const result = await res.json();
 
@@ -97,6 +123,42 @@
   function handleSelect(event) {
     sendMessage(event.detail);
   }
+
+  async function sendFeedback(detail) {
+    // detail: { sql, question }
+    // Note: We need to ensure we have the question context.
+    // Current implementation passes sql. We might need the original question.
+    // For now, let's assume the user just likes the SQL.
+    // But the API expects 'question'.
+    // Let's pass the last user message as context if not provided.
+
+    const question =
+      detail.question ||
+      messages
+        .slice()
+        .reverse()
+        .find((m) => m.role === "user")?.content ||
+      "Unknown context";
+
+    try {
+      const res = await fetch(`${API_URL}/chat/feedback`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({ question: question, sql: detail.sql }),
+      });
+
+      if (res.ok) {
+        alert("Thanks! Feedback saved. 🧠");
+      } else {
+        console.error("Feedback failed");
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
 </script>
 
 <div
@@ -110,6 +172,7 @@
         <MessageBubble
           message={msg}
           on:proceed={(e) => confirmExecution(e.detail)}
+          on:feedback={(e) => sendFeedback(e.detail)}
         />
       </div>
     {/each}
