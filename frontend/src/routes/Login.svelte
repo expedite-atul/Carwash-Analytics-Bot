@@ -49,7 +49,7 @@
             <h1
                 class="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent"
             >
-                Carwash Bot
+                Query Sense Bot
             </h1>
             <p class="mt-2 text-gray-400">Sign in to access analytics</p>
         </div>
