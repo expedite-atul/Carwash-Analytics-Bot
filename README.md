@@ -97,7 +97,6 @@ This system uses a **Provider-Agnostic** design. By default, it uses **Local Emb
 sequenceDiagram
     actor User
     participant UI as Svelte Frontend
-    participant API as FastAPI Backend
     participant VS as PGVector (Local DB)
     participant HF as HuggingFace (Local CPU)
     participant LLM as Gemini API
@@ -105,16 +104,25 @@ sequenceDiagram
     User->>UI: "How many customers?"
     UI->>API: POST /chat/plan
     
+    rect rgb(220, 255, 220)
+        Note over API, VS: 1. Semantic Cache (Speed)
+        API->>HF: Embed Query
+        HF-->>API: Vector
+        API->>VS: Check Exact Match (Distance < 0.05)
+        alt Match Found
+            VS-->>API: Return Cached SQL
+            API-->>UI: Return Plan (Instant)
+        end
+    end
+
     rect rgb(240, 248, 255)
-        Note over API, VS: RAG Memory Retrieval
-        API->>HF: Embed Query (Local Model)
-        HF-->>API: Vector [0.12, -0.4...]
-        API->>VS: SELECT lowest cosine distance
+        Note over API, VS: 2. RAG Retrieval (If No Cache)
+        API->>VS: SELECT similar examples (Distance < 0.5)
         VS-->>API: Similar Past SQL Examples
     end
 
     rect rgb(255, 240, 245)
-        Note over API, LLM: Generation
+        Note over API, LLM: 3. Generation
         API->>LLM: Prompt (Schema + RAG Examples + Query)
         LLM-->>API: Generated SQL Plan
     end
@@ -128,13 +136,11 @@ sequenceDiagram
     API-->>UI: JSON (KPI or Table)
     UI-->>User: Render Smart Card
 
-    opt Feedback Loop (Self-Learning)
-        User->>UI: Click "Thumbs Up"
-        UI->>API: POST /chat/feedback
-        API->>HF: Embed (Question + Approved SQL)
+    rect rgb(255, 250, 205)
+        Note over API, VS: 4. Auto-Learning
+        API->>HF: Embed (Question + Executed SQL)
         HF-->>API: New Vector
         API->>VS: INSERT INTO golden_queries
-        Note right of VS: System learns this query<br/>for future retrieval!
     end
 ```
 

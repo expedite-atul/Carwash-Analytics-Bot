@@ -25,7 +25,7 @@ if DATABASE_URL and "postgresql://" not in DATABASE_URL:
      # Generic fallback if protocol missing? Unlikely but good safety.
     pass
 
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+engine = create_engine(DATABASE_URL, pool_pre_ping=True, echo=True)
 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)

@@ -15,3 +15,7 @@ redis
 passlib[bcrypt]
 python-jose[cryptography]
 python-multipart
+pydantic>=2.10
+langchain>=0.3.0
+langchain-huggingface
+

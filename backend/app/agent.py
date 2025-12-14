@@ -122,16 +122,52 @@ def get_similar_examples(question: str, k=2):
         print(f"❌ Vector Search Error: {e}")
         return ""
 
-def add_golden_query(question: str, sql_query: str):
-    """Adds a new verified Q/SQL pair to the vector store."""
+def get_exact_match(question: str, threshold=0.05):
+    """
+    Checks for a semantically identical question in the vector store.
+    Returns:
+        matches (list): List of (sql_query, distance) tuples if found, else empty list.
+    """
     try:
-        vector = embeddings.embed_query(question)
+        query_vec = embeddings.embed_query(question)
         with engine.connect() as conn:
+            # We want the CLOSEST match.
+            # Using <-> (L2 distance) or <=> (Cosine distance). 
+            # Since vectors are normalized, both work. We used <=> before.
+            stmt = text("SELECT sql_query, embedding <=> :vec as score FROM golden_queries ORDER BY score ASC LIMIT 1")
+            row = conn.execute(stmt, {"vec": str(query_vec)}).fetchone()
+            
+            if row:
+                sql_query, score = row
+                if score < threshold:  # Match!
+                    print(f"🎯 Cache Hit! Score: {score}")
+                    return sql_query
+        return None
+    except Exception as e:
+        print(f"❌ Cache Check Error: {e}")
+        return None
+
+def add_golden_query(question: str, sql_query: str):
+    """Adds a new verified Q/SQL pair to the vector store if it doesn't exist."""
+    try:
+        with engine.connect() as conn:
+            # 1. Check if exists (deduplication)
+            # We match strictly on the Question + SQL pair to avoid flooding the DB
+            check_stmt = text("SELECT 1 FROM golden_queries WHERE question = :q AND sql_query = :sql")
+            exists = conn.execute(check_stmt, {"q": question, "sql": sql_query}).scalar()
+            
+            if exists:
+                print(f"⚠️ Query knowledge already exists. Skipping duplicate.")
+                return True
+
+            # 2. Add if new
+            vector = embeddings.embed_query(question)
             conn.execute(
                 text("INSERT INTO golden_queries (question, sql_query, embedding) VALUES (:q, :sql, :vec)"),
                 {"q": question, "sql": sql_query, "vec": str(vector)}
             )
             conn.commit()
+            print(f"✅ Learned new query: {question}")
         return True
     except Exception as e:
         print(f"❌ Failed to add golden query: {e}")
@@ -177,6 +213,16 @@ def process_user_question(question: str):
     Returns a plan containing the generated SQL and an explanation.
     """
     try:
+        # 0. Check Semantic Cache
+        cached_sql = get_exact_match(question)
+        if cached_sql:
+            return {
+                "status": "success",
+                "type": "plan",
+                "sql": cached_sql,
+                "explanation": "I found an exact match in my memory! Here is the saved query."
+            }
+
         generated_sql = get_sql_chain(question)
         clean_sql = generated_sql.replace("```sql", "").replace("```", "").strip()
         

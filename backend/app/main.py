@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
-from .agent import process_user_question, execute_approved_sql
+from .agent import process_user_question, execute_approved_sql, add_golden_query
 from .db import create_db_and_tables, engine, get_session
 from .routers import auth_routes, admin_routes
 from .auth import get_current_active_user
@@ -60,7 +60,7 @@ class FeedbackRequest(BaseModel):
 @app.post("/chat/feedback")
 async def feedback_endpoint(request: FeedbackRequest, user: User = Depends(get_current_active_user)):
     """User likes a query -> Add to Golden Queries (RBAC: Employees can do this too)."""
-    success = agent.add_golden_query(request.question, request.sql)
+    success = add_golden_query(request.question, request.sql)
     if not success:
         raise HTTPException(status_code=500, detail="Failed to save feedback")
     return {"status": "success", "message": "Feedback received! I got smarter."}
@@ -176,6 +176,21 @@ async def execute_query(
         )
         session.add(bot_msg)
         session.commit()
+
+    # 3. Auto-Learn (Feedback Loop)
+    if result_response["status"] == "success":
+        # Get the executed SQL 
+        # Get the original question (Last user message in this session)
+        last_user_msg = session.exec(
+            select(ChatMessage)
+            .where(ChatMessage.session_id == chat_session.id)
+            .where(ChatMessage.role == "user")
+            .order_by(ChatMessage.created_at.desc())
+        ).first()
+
+        if last_user_msg:
+            print(f"🧠 Auto-Learning: Saving '{last_user_msg.content}' -> SQL")
+            add_golden_query(last_user_msg.content, request.sql)
 
     return result_response
 
