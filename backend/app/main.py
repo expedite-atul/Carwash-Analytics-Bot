@@ -196,4 +196,4 @@ async def execute_query(
 
 @app.get("/")
 async def root():
-    return {"message": "QuerySense Bot API v2 (Auth + Redis)"}
+    return {"message": "Query Sense Bot API v2 (Auth + Redis)"}
