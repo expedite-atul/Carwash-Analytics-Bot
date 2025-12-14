@@ -7,7 +7,7 @@ A RAG-enhanced Business Intelligence bot that allows carwash owners to query the
 ![Svelte](https://img.shields.io/badge/svelte-5.0-orange.svg)
 
 ## Demo
-<video src="application_recording.mov" controls width="100%"></video>
+[🎥 Watch Implementation Demo (MOV)](./application_recording.mov)
 
 ## Features
 *   **Natural Language to SQL**: Ask "How many active customers do we have?" and get real data.
