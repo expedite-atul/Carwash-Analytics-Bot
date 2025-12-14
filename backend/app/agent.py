@@ -1,5 +1,7 @@
 import os
 import json
+import time
+from typing import List, Optional
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 # from langchain_community.embeddings import HuggingFaceEmbeddings # DEPRECATED
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -11,8 +13,10 @@ from langchain_community.utilities import SQLDatabase
 from langchain_core.prompts import PromptTemplate
 from dotenv import load_dotenv
 from sqlalchemy import text
+from sqlmodel import Session, select
 from .cache import cache
 from .db import engine
+from .models import GoldenQuery
 import re
 
 load_dotenv()
@@ -118,17 +122,34 @@ except Exception as e:
         print("   -> Hint: You switched embedding models but DB has old vector size. Drop table 'golden_queries'.")
 
 
-def get_similar_examples(question: str, k=2):
-    """Finds similar SQL examples using pgvector cosine distance."""
+def get_similar_examples(question: str, k: int = 3) -> str:
+    """
+    RAG Logic:
+    1. Embed the user question.
+    2. Search PGVector for top-k similar SQL queries.
+    3. Format them as a string for the prompt.
+    """
+    t_start = time.perf_counter()
     try:
-        query_vec = embeddings.embed_query(question)
-        with engine.connect() as conn:
-            stmt = text("SELECT question, sql_query FROM golden_queries ORDER BY embedding <=> :vec LIMIT :k")
-            results = conn.execute(stmt, {"vec": str(query_vec), "k": k}).fetchall()
+        query_vector = embeddings.embed_query(question)
+        t_embed = time.perf_counter()
+        print(f"[PERF] Embedding Gen: {t_embed - t_start:.4f}s")
+        
+        # Search in DB using ORM
+        with Session(engine) as session:
+            # Using l2_distance for similarity search
+            statement = select(GoldenQuery).order_by(GoldenQuery.embedding.l2_distance(query_vector)).limit(k)
+            results = session.exec(statement).all()
             
+        t_search = time.perf_counter()
+        print(f"[PERF] Vector Search: {t_search - t_embed:.4f}s")
+        
+        if not results:
+            return "No similar examples found."
+                
         examples_str = ""
-        for q, sql in results:
-            examples_str += f"- Question: {q}\n  SQL: {sql}\n"
+        for item in results:
+            examples_str += f"- Question: {item.question}\n  SQL: {item.sql_query}\n"
         return examples_str
     except Exception as e:
         print(f"Vector Search Error: {e}")
@@ -217,26 +238,41 @@ If you select more than 2 columns, the system will fail to render the chart.
 Similar Examples (Golden Queries):
 {examples}
 
+Previous Conversation History:
+{history}
+
 Question: {input}
 SQLQuery:"""
 
 prompt_template = PromptTemplate.from_template(template)
 
-def get_sql_chain(question: str):
+def get_sql_chain(question: str, history: str = ""):
+    start_time = time.perf_counter()
+    
     # RAG Step: Get Context
+    t0 = time.perf_counter()
     examples = get_similar_examples(question)
+    t1 = time.perf_counter()
+    print(f"[PERF] RAG Retrieval: {t1 - t0:.4f}s")
     
     # Manual chain: Get Schema -> Format Prompt -> Call LLM
     table_info = db.get_table_info()
     formatted_prompt = prompt_template.format(
         table_info=table_info,
         examples=examples,
+        history=history,
         input=question
     )
+    
+    t2 = time.perf_counter()
     response = llm.invoke(formatted_prompt)
+    t3 = time.perf_counter()
+    print(f"[PERF] LLM Generation: {t3 - t2:.4f}s")
+    print(f"[PERF] Total Chain: {t3 - start_time:.4f}s")
+    
     return response.content
 
-async def process_user_question(question: str):
+async def process_user_question(question: str, chat_history: str = ""):
     """
     Returns a plan containing the generated SQL and an explanation.
     """
@@ -255,7 +291,7 @@ async def process_user_question(question: str):
         # If we got here, it's a miss (for exact match)
         await cache.track_miss(question)
 
-        generated_sql = get_sql_chain(question)
+        generated_sql = get_sql_chain(question, chat_history)
         clean_sql = generated_sql.replace("```sql", "").replace("```", "").strip()
         
         return {

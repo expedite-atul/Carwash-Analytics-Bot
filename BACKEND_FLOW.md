@@ -148,16 +148,23 @@ By converting text to numbers (Vectors), we can use math (Cosine Distance) to fi
 
 ### 1. `POST /chat/plan`
 1.  **Input**: User Message string.
-2.  **Vectorization**: Convert message to 384-dim vector using `all-MiniLM-L6-v2`.
-3.  **Cache Check**: Query `golden_queries` for distance `< 0.05`.
+2.  **Context Injection (New in Phase 2)**:
+    -   Fetch last 3 messages from `chatmessage` table.
+    -   Format as "Previous Conversation History" for the LLM.
+    -   *Benefit*: Enables follow-up questions like "What about last month?".
+3.  **Performance Monitoring (New in Phase 2)**:
+    -   Timers track: `Embedding Gen` vs `Vector Search` vs `LLM Generation`.
+    -   Logs identifying bottlenecks (e.g., "AI Overload").
+4.  **Vectorization**: Convert message to 384-dim vector using `all-MiniLM-L6-v2`.
+5.  **Cache Check**: Query `golden_queries` for distance `< 0.05`.
     -   *If Found*: Return immediately.
-4.  **Context Retrieval**: Query `golden_queries` for distance `< 0.5` (k=3).
-5.  **Prompt Construction**:
+6.  **Context Retrieval**: Query `golden_queries` for distance `< 0.5` (k=3).
+7.  **Prompt Construction**:
     -   System Prompt: "You are a Postgres expert..."
-    -   Context: Schema Definitions + Similar Examples.
+    -   Context: Schema Definitions + Similar Examples + Conversation History.
     -   User Input.
-6.  **LLM Call**: Send to Gemini.
-7.  **Output**: JSON Plan `{ sql: "...", explanation: "..." }`.
+8.  **LLM Call**: Send to Gemini.
+9.  **Output**: JSON Plan `{ sql: "...", explanation: "..." }`.
 
 ### 2. `POST /chat/execute`
 1.  **Input**: SQL string.

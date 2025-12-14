@@ -17,7 +17,7 @@
         if (!canvas) return;
 
         chartInstance = new Chart(canvas, {
-            type,
+            type: type || "bar", // Safety: Fallback to bar if undefined
             data,
             options: {
                 responsive: true,

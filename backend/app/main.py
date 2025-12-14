@@ -74,7 +74,12 @@ async def get_chat_history(user: User = Depends(get_current_active_user), sessio
     if not chat_session:
         return []
     
-    messages = session.exec(select(ChatMessage).where(ChatMessage.session_id == chat_session.id).order_by(ChatMessage.created_at)).all()
+    
+    # Optimization: Fetch only last 50 messages
+    messages = session.exec(select(ChatMessage).where(ChatMessage.session_id == chat_session.id).order_by(ChatMessage.created_at.desc()).limit(50)).all()
+    
+    # Reverse to chronological order for frontend
+    messages = messages[::-1]
     
     # Format for frontend
     history = []
@@ -137,10 +142,30 @@ async def create_plan(
     )
     session.add(user_msg)
     
-    # 3. Generate Plan
-    plan_response = await process_user_question(request.message)
+    # 3. Get Context (Last 3 messages)
+    history_str = ""
+    try:
+        recent_msgs = session.exec(
+            select(ChatMessage)
+            .where(ChatMessage.session_id == chat_session.id)
+            .order_by(ChatMessage.created_at.desc())
+            .limit(3)
+        ).all()
+        
+        # Reverse to chronological order (Oldest -> Newest)
+        recent_msgs = recent_msgs[::-1]
+        
+        for m in recent_msgs:
+            role = "User" if m.role == "user" else "AI"
+            history_str += f"{role}: {m.content}\n"
+            
+    except Exception as e:
+        print(f"Context Error: {e}")
+
+    # 4. Generate Plan with Context
+    plan_response = await process_user_question(request.message, chat_history=history_str)
     
-    # 4. Save Bot Response
+    # 5. Save Bot Response
     meta = {}
     if plan_response["status"] == "success":
         meta = {

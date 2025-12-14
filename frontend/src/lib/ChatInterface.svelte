@@ -7,6 +7,7 @@
 
   let messages = [
     {
+      uuid: "welcome",
       role: "bot",
       content:
         "Hello! I'm Query Sense Bot. Ask me about revenue, customers, vehicles or memberships.",
@@ -25,7 +26,11 @@
       });
       const history = await res.json();
       if (history && history.length > 0) {
-        messages = history;
+        // Enforce UUIDs for keyed each loop
+        messages = history.map((msg) => ({
+          ...msg,
+          uuid: crypto.randomUUID(),
+        }));
       }
     } catch (e) {
       console.error("Failed to load history", e);
@@ -38,7 +43,10 @@
     if (!text || !text.trim()) return;
 
     // Optimistic UI
-    messages = [...messages, { role: "user", content: text }];
+    messages = [
+      ...messages,
+      { uuid: crypto.randomUUID(), role: "user", content: text },
+    ];
     input = "";
     isLoading = true;
 
@@ -52,13 +60,14 @@
         },
         body: JSON.stringify({ message: text }),
       });
+
       const data = await res.json();
-      console.log("DEBUG PLAN RESPONSE:", data);
 
       if (data.status === "success") {
         messages = [
           ...messages,
           {
+            uuid: crypto.randomUUID(), // Unique Key
             role: "model",
             content: data.explanation,
             type: "plan",
@@ -68,14 +77,22 @@
       } else {
         messages = [
           ...messages,
-          { role: "model", content: "Error: " + data.message },
+          {
+            uuid: crypto.randomUUID(),
+            role: "model",
+            content: "Error: " + data.message,
+          },
         ];
       }
     } catch (e) {
       console.error(e);
       messages = [
         ...messages,
-        { role: "model", content: "Network Error: " + e.message },
+        {
+          uuid: crypto.randomUUID(),
+          role: "model",
+          content: "Network Error: " + e.message,
+        },
       ];
     } finally {
       isLoading = false;
@@ -100,6 +117,7 @@
         // result.data contains { type: 'kpi'|'table', data: {...} }
         // We inject the SQL back into the message for transparency
         const newMsg = {
+          uuid: crypto.randomUUID(),
           role: "model",
           type: result.type,
           chartType: result.chartType, // Capture chart type (bar, line, pie)
@@ -110,13 +128,21 @@
       } else {
         messages = [
           ...messages,
-          { role: "model", content: "Execution Error: " + result.message },
+          {
+            uuid: crypto.randomUUID(),
+            role: "model",
+            content: "Execution Error: " + result.message,
+          },
         ];
       }
     } catch (e) {
       messages = [
         ...messages,
-        { role: "model", content: "Network Error: " + e.message },
+        {
+          uuid: crypto.randomUUID(),
+          role: "model",
+          content: "Network Error: " + e.message,
+        },
       ];
     } finally {
       isLoading = false;
@@ -187,6 +213,7 @@
       if (res.ok) {
         messages = [
           {
+            uuid: "welcome",
             role: "bot",
             content:
               "Chat cleared! Ask me about revenue, customers, vehicles or memberships.",
@@ -221,7 +248,7 @@
     bind:this={chatContainer}
     class="flex-1 overflow-y-auto p-4 sm:p-6 scroll-smooth"
   >
-    {#each messages as msg}
+    {#each messages as msg (msg.uuid)}
       <div class="relative group">
         <!-- Handle 'proceed' event from the bubble -->
         <MessageBubble
