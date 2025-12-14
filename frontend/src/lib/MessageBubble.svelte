@@ -153,6 +153,12 @@
                     </div>
                 {/if}
             </div>
+            <p class="text-[10px] text-gray-400 mt-1 ml-1">
+                {new Date().toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                })}
+            </p>
         {/if}
     </div>
 </div>

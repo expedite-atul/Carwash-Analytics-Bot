@@ -26,7 +26,7 @@
 </script>
 
 <div
-  class="h-full flex flex-col py-6 bg-gray-900 border-r border-gray-800 transition-all duration-300 relative {isCollapsed
+  class="h-full flex flex-col pb-6 bg-gray-900 border-r border-gray-800 transition-all duration-300 relative {isCollapsed
     ? 'w-20'
     : 'w-64'}"
 >
@@ -51,13 +51,15 @@
   </button>
 
   <!-- Logo Area -->
-  <div class="px-6 mb-8 flex items-center gap-3 overflow-hidden">
+  <div
+    class="px-6 h-16 flex items-center gap-3 overflow-hidden mb-2 border-b border-gray-800/50"
+  >
     <div
-      class="shrink-0 h-10 w-10 flex items-center justify-center transition-all duration-300 {isCollapsed
+      class="shrink-0 h-8 w-8 flex items-center justify-center transition-all duration-300 {isCollapsed
         ? 'mx-auto'
         : ''}"
     >
-      <div class="w-10 h-10 drop-shadow-[0_0_10px_rgba(100,255,218,0.3)]">
+      <div class="w-8 h-8 drop-shadow-[0_0_10px_rgba(100,255,218,0.3)]">
         <IconLogo />
       </div>
     </div>

@@ -15,7 +15,12 @@ A RAG-enhanced Business Intelligence bot that allows carwash owners to query the
 *   **Smart Dashboard**: 
     *   **KPI Cards**: Big stats for important numbers.
     *   **Data Tables**: Clean formatting for lists.
+    *   **Data Tables**: Clean formatting for lists.
     *   **Suggestion Chips**: Quick shortcuts for common business questions.
+*   **User Experience**:
+    *   **Clear Chat**: One-click history wipe with a custom confirmation modal.
+    *   **Visuals**: Glassmorphism headers, light/dark mode compatible (currently optimized for Light Mode).
+    *   **Auto-Scroll**: Smart scrolling to keep the latest message in view.
 *   **Secure**: Runs with a Read-Only database user.
 
 ## Tech Stack
