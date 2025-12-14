@@ -21,51 +21,87 @@ sequenceDiagram
     autonumber
     
     actor User
-    participant A as Agent (Python)
-    participant E as Embedder (Local HF)
-    participant DB as Postgres (pgvector)
-    participant AI as Gemini LLM
+    participant UI as Frontend UI
+    participant API as Agent (Python)
+    participant VS as PGVector (Local DB)
+    participant HF as HuggingFace (Local CPU)
+    participant LLM as Gemini API
 
-    Note over User, AI: Phase 1: Planning (Text-to-SQL)
-
-    User->>A: "Total active customers?"
+    User->>UI: "Revenue by month?"
+    UI->>API: POST /chat/plan
     
-    %% Layer 1: Semantic Cache
-    A->>E: Embed Question
-    E-->>A: Vector V1
-    A->>DB: SELECT * FROM golden_queries WHERE dist(V1) < 0.05
-    alt Cache Hit (Distance < 0.05)
-        DB-->>A: Found SQL: "SELECT count(*) ..."
-        A-->>User: Return Cached Plan (Status: Success)
-    else Cache Miss
-        %% Layer 2: RAG
-        A->>DB: SELECT * FROM golden_queries WHERE dist(V1) < 0.5 LIMIT 3
-        DB-->>A: Return Similar Examples (Context)
-        
-        %% Layer 3: Generation
-        A->>AI: Prompt(Schema + Examples + Question)
-        AI-->>A: Generated SQL
-        A-->>User: Return Generated Plan
+    rect rgb(220, 255, 220)
+        Note over API, VS: 1. Semantic Cache
+        API->>HF: Embed Query
+        HF-->>API: Vector
+        API->>VS: Check Exact Match
+        alt Match Found
+            VS-->>API: Return Cached SQL
+        end
     end
 
-    Note over User, AI: Phase 2: Execution & Learning
+    rect rgb(240, 248, 255)
+        Note over API, VS: 2. RAG Retrieval (If Miss)
+        API->>VS: Get Similar Examples
+    end
 
-    User->>A: Execute Plan (SQL)
-    A->>DB: Run SQL (Read-Only User)
-    DB-->>A: Results (Rows)
+    rect rgb(255, 240, 245)
+        Note over API, LLM: 3. Generation
+        API->>LLM: Prompt (Schema + RAG)
+        LLM-->>API: SQL Plan
+    end
+
+    API-->>UI: Return Plan
+    
+    User->>UI: Click "Proceed"
+    UI->>API: POST /chat/execute
+    API->>VS: Execute SQL
+    VS-->>API: Raw Rows
+    
+    rect rgb(230, 230, 250)
+        Note over API: 4. Visual Analysis
+        API->>API: Detect Chart Type? (Bar/Line)
+        API->>API: Gen Chart Config (JSON)
+    end
+
+    API-->>UI: Response (Rows + Meta Info)
+    UI-->>User: Render Table OR Chart
     
     %% Auto-Learning (Implicit Feedback)
     par Async Learning
-        A->>E: Embed Original Question
-        E-->>A: Vector V1
-        A->>DB: INSERT INTO golden_queries (Question, SQL, V1)
     end
     
     A-->>User: Return Results (Data/Chart)
 ```
 
-## Deep Dive: The `golden_queries` Table
+## 5. Chart Auto-Detection (New in Phase 2)
+After executing SQL, the backend analyzes the shape of the data to suggest a visualization:
+*   **Bar Chart**: If the result contains 1 Categorical Column (Text) and 1 Numeric Column. (e.g. "Revenue by Make")
+*   **Line Chart**: If the result contains 1 Time/Date Column and 1 Numeric Column. (e.g. "Sales over time")
+*   **Pie Chart**: If the result is small (< 5 rows) and categorical.
+*   **Table**: Fallback for everything else.
 
+### 3. `DELETE /chat/history`
+1.  **Input**: User JWT Token.
+2.  **Action**: Finds the active `ChatSession` for the user.
+3.  **Result**: 
+    -   Deletes all `ChatMessage` rows for that session.
+    -   Deletes the `ChatSession` entry.
+    -   Returns `{satus: "success"}`.
+4.  **UI Effect**: Resets the chat interface to the welcome state.
+
+## 5. Chart Auto-Detection (Logic & Heuristics)
+After executing SQL, the backend analyzes the shape of the data to suggest a visualization:
+*   **Bar Chart**: Exactly 2 columns: [Category, Metric]. (e.g., `Make` vs `Count`).
+*   **Line Chart**: Exactly 2 columns: [Date/Time, Metric]. (e.g., `Created At` vs `Count`).
+*   **Pie Chart**: Small categorical result (< 5 rows).
+*   **Table**: Fallback for anything with > 2 columns or mismatched types.
+
+**Note**: To ensure charts render correctly, the LLM System Prompt explicitly enforces a "2-Column Rule" when a visual format is implied.
+
+This config is sent in `meta_info` so the frontend knows exactly what to render.
+
+## 6. Deep Dive: Golden Queries (Auto-Learning)
 This table is the **Long-Term Memory** of the chatbot. It doesn't just store text; it stores the *meaning* of the text.
 
 ### Schema

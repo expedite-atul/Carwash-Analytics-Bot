@@ -2,6 +2,7 @@
   import { afterUpdate, onMount } from "svelte";
   import MessageBubble from "./MessageBubble.svelte";
   import SuggestionChips from "./SuggestionChips.svelte";
+  import ConfirmModal from "./ConfirmModal.svelte";
   import { token } from "../stores/auth"; // Import Token Store
 
   let messages = [
@@ -52,6 +53,7 @@
         body: JSON.stringify({ message: text }),
       });
       const data = await res.json();
+      console.log("DEBUG PLAN RESPONSE:", data);
 
       if (data.status === "success") {
         messages = [
@@ -100,6 +102,7 @@
         const newMsg = {
           role: "model",
           type: result.type,
+          chartType: result.chartType, // Capture chart type (bar, line, pie)
           data: result.data,
           sql: result.data.sql, // Ensure SQL is passed for the bubble footer
         };
@@ -159,13 +162,65 @@
       console.error(e);
     }
   }
+  let chatContainer;
+
+  function scrollToBottom() {
+    if (chatContainer) {
+      chatContainer.scrollTo({
+        top: chatContainer.scrollHeight,
+        behavior: "smooth",
+      });
+    }
+  }
+
+  afterUpdate(() => {
+    scrollToBottom();
+  });
+
+  async function performClearChat() {
+    showClearModal = false;
+    try {
+      const res = await fetch(`${API_URL}/chat/history`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      if (res.ok) {
+        messages = [
+          {
+            role: "bot",
+            content:
+              "Chat cleared! Ask me about revenue, customers, vehicles or memberships.",
+          },
+        ];
+      }
+    } catch (e) {
+      console.error("Failed to clear chat", e);
+    }
+  }
+
+  // Exposed to parent
+  export function clearChat() {
+    showClearModal = true;
+  }
+
+  let showClearModal = false;
 </script>
 
-<div
-  class="flex flex-col h-full bg-surface/50 rounded-2xl overflow-hidden relative"
->
+<div class="flex flex-col h-full bg-transparent overflow-hidden relative">
+  {#if showClearModal}
+    <ConfirmModal
+      title="Clear Conversation"
+      message="Are you sure you want to delete all history? This cannot be undone."
+      confirmText="Yes, Clear All"
+      on:cancel={() => (showClearModal = false)}
+      on:confirm={performClearChat}
+    />
+  {/if}
   <!-- Chat Area -->
-  <div class="flex-1 overflow-y-auto p-6 scroll-smooth">
+  <div
+    bind:this={chatContainer}
+    class="flex-1 overflow-y-auto p-4 sm:p-6 scroll-smooth"
+  >
     {#each messages as msg}
       <div class="relative group">
         <!-- Handle 'proceed' event from the bubble -->

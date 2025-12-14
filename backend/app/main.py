@@ -97,6 +97,24 @@ async def get_chat_history(user: User = Depends(get_current_active_user), sessio
             
     return history
 
+@app.delete("/chat/history")
+async def clear_chat_history(user: User = Depends(get_current_active_user), session: Session = Depends(get_session)):
+    """Clear all chat history for the user."""
+    # MVP: Find the user's session and delete it
+    chat_session = session.exec(select(ChatSession).where(ChatSession.user_id == user.id).order_by(ChatSession.id.desc())).first()
+    
+    if chat_session:
+         # Delete messages first (cascade might handle it, but explicit is safer for now)
+         messages = session.exec(select(ChatMessage).where(ChatMessage.session_id == chat_session.id)).all()
+         for m in messages:
+             session.delete(m)
+         
+         # Delete session
+         session.delete(chat_session)
+         session.commit()
+    
+    return {"status": "success", "message": "Chat history cleared"}
+
 @app.post("/chat/plan")
 async def create_plan(
     request: ChatRequest, 

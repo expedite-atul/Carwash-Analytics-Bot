@@ -207,6 +207,13 @@ DOMAIN KNOWLEDGE:
 Only use the following tables:
 {table_info}
 
+CRITICAL FOR CHARTS:
+If the user asks for a visual (Bar, Line, Pie), you MUST select EXACTLY TWO columns:
+1. One for the Label (Name, Date, Category)
+2. One for the Metric (Count, Sum, Avg)
+Do NOT include extra description columns like First/Last name if you already have a Name column.
+If you select more than 2 columns, the system will fail to render the chart.
+
 Similar Examples (Golden Queries):
 {examples}
 
@@ -255,7 +262,7 @@ async def process_user_question(question: str):
             "status": "success",
             "type": "plan",
             "sql": clean_sql,
-            "explanation": f"I found some similar past queries to help me. I will query the 'customer' table."
+            "explanation": "I have constructed a new SQL plan based on your request and my domain knowledge."
         }
     except Exception as e:
         error_str = str(e)
@@ -290,11 +297,23 @@ def execute_approved_sql(sql_query: str):
             # If 2 columns, and one is numeric and other is string/date -> Bar Chart
             if len(columns) == 2 and len(rows) > 1:
                 col1, col2 = columns[0], columns[1]
-                # Check types of first row
-                val1, val2 = rows[0][0], rows[0][1]
                 
-                is_num1 = isinstance(val1, (int, float))
-                is_num2 = isinstance(val2, (int, float))
+                # Find first row with non-None values for type inference
+                val1, val2 = None, None
+                for row in rows:
+                    if row[0] is not None and row[1] is not None:
+                        val1, val2 = row[0], row[1]
+                        break
+                
+                # If all are None, fallback to table
+                if val1 is None:
+                    return {"status": "success", "type": "table", "data": {"columns": list(columns), "rows": data, "sql": sql_query}}
+                
+                # Check types of first valid row
+                
+                from decimal import Decimal
+                is_num1 = isinstance(val1, (int, float, Decimal))
+                is_num2 = isinstance(val2, (int, float, Decimal))
                 
                 if is_num1 != is_num2: # Exactly one is numeric
                     # Identify inputs
@@ -304,10 +323,33 @@ def execute_approved_sql(sql_query: str):
                     # Heuristic: If label looks like Date, use Line Chart
                     import datetime
                     first_label = data[0][label_key]
-                    is_date = isinstance(first_label, (datetime.date, datetime.datetime))
                     
-                    chart_type = "line" if is_date else "bar"
+                    # Robust Date Check
+                    is_date = False
+                    if isinstance(first_label, (datetime.date, datetime.datetime)):
+                        is_date = True
+                    elif isinstance(first_label, str):
+                        # Simple regex for YYYY-MM-DD or similar
+                        import re
+                        if re.match(r'\d{4}-\d{2}-\d{2}', first_label):
+                            is_date = True
                     
+                    chart_type = "bar"
+                    if is_date:
+                        chart_type = "line"
+                    elif len(data) <= 5:
+                         # Small Key-Value data usually looks good as Pie
+                         chart_type = "pie"
+                        
+                    # Colors for Pie Chart
+                    bg_colors = [
+                        'rgba(255, 99, 132, 0.7)',
+                        'rgba(54, 162, 235, 0.7)',
+                        'rgba(255, 206, 86, 0.7)',
+                        'rgba(75, 192, 192, 0.7)',
+                        'rgba(153, 102, 255, 0.7)',
+                    ] if chart_type == 'pie' else 'rgba(75, 192, 192, 0.7)'
+
                     return {
                         "status": "success", 
                         "type": "chart", 
@@ -316,7 +358,10 @@ def execute_approved_sql(sql_query: str):
                             "labels": [r[label_key] for r in data],
                             "datasets": [{
                                 "label": value_key,
-                                "data": [r[value_key] for r in data]
+                                "data": [r[value_key] for r in data],
+                                "backgroundColor": bg_colors,
+                                "borderColor": 'rgba(75, 192, 192, 1)',
+                                "borderWidth": 1
                             }],
                             "sql": sql_query
                         }
