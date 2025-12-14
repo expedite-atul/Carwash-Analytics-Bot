@@ -11,6 +11,7 @@ from langchain_community.utilities import SQLDatabase
 from langchain_core.prompts import PromptTemplate
 from dotenv import load_dotenv
 from sqlalchemy import text
+from .cache import cache
 from .db import engine
 import re
 
@@ -18,10 +19,11 @@ load_dotenv()
 
 # --- Configuration & Factory ---
 
+
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini") # Options: gemini, openai, anthropic
 EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "local") # Options: local, google, openai
 
-print(f"🔹 Config: LLM={LLM_PROVIDER}, Embeddings={EMBEDDING_PROVIDER}")
+print(f"Config: LLM={LLM_PROVIDER}, Embeddings={EMBEDDING_PROVIDER}")
 
 # 1. LLM Factory
 def get_llm():
@@ -42,7 +44,7 @@ def get_llm():
 # 2. Embedding Factory
 def get_embeddings():
     if EMBEDDING_PROVIDER == "local":
-        print("⚡️ Loading Local Embeddings (HuggingFace)...")
+        print("Loading Local Embeddings (HuggingFace)...")
         # standard lightweight model, no API cost
         return HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
     elif EMBEDDING_PROVIDER == "google":
@@ -55,7 +57,7 @@ def get_embeddings():
 llm = get_llm()
 embeddings = get_embeddings()
 
-db = SQLDatabase(engine, include_tables=['customer'])
+db = SQLDatabase(engine, include_tables=['customer','vehicle', 'membership_account'])
 
 # --- RAG: Golden Queries ---
 # Simple In-Memory "Vector Store" logic for MVP using pgvector directly is robust.
@@ -63,7 +65,17 @@ db = SQLDatabase(engine, include_tables=['customer'])
 INITIAL_GOLDEN_QUERIES = [
     ("How many customers do we have?", "SELECT count(*) FROM customer;"),
     ("Who are the active customers?", "SELECT first_name, last_name, email FROM customer WHERE active = true LIMIT 10;"),
-    ("Show me customers from store 1.", "SELECT * FROM customer WHERE store_id = 1 LIMIT 5;")
+    ("Show me customers from store 1.", "SELECT * FROM customer WHERE store_id = 1 LIMIT 5;"),
+    # New Coverage: Vehicles
+    ("How many blocked vehicles are there?", "SELECT count(*) FROM vehicle WHERE black_listed = 1;"),
+    ("List all Tesla vehicles.", "SELECT * FROM vehicle WHERE make ILIKE '%Tesla%' LIMIT 5;"),
+    # New Coverage: Membersships
+    ("Total monthly billing amount?", "SELECT sum(billing_amount) FROM membership_account;"),
+    ("Show me members on trial.", "SELECT * FROM membership_account WHERE is_on_trial = true LIMIT 5;"),
+    ("Which accounts are cancelled?", "SELECT * FROM membership_account WHERE status = -1 LIMIT 5;"),
+    # New Coverage: Complex Aggregation
+    ("Who has more than one active membership?", "SELECT c.first_name, c.last_name, count(ma.id) as count FROM customer c JOIN membership_account ma ON c.customer_uuid::text = ma.customer_id WHERE ma.status = 1 GROUP BY c.first_name, c.last_name HAVING count(ma.id) > 1 LIMIT 5;"),
+    ("Show me customers with active membership on a vehicle.", "SELECT c.first_name, ma.name, v.license FROM customer c JOIN membership_account ma ON c.customer_uuid::text = ma.customer_id JOIN vehicle v ON c.customer_uuid = v.customer_uuid WHERE ma.status = 1 AND v.active = 1 LIMIT 5;")
 ]
 
 def seed_golden_queries():
@@ -83,7 +95,7 @@ def seed_golden_queries():
             # Check if empty
             result = conn.execute(text("SELECT count(*) FROM golden_queries")).scalar()
             if result == 0:
-                print(f"🌱 Seeding Golden Queries using {EMBEDDING_PROVIDER} (dim={dim})...")
+                print(f"Seeding Golden Queries using {EMBEDDING_PROVIDER} (dim={dim})...")
                 for q, sql in INITIAL_GOLDEN_QUERIES:
                     vector = embeddings.embed_query(q)
                     conn.execute(
@@ -91,15 +103,15 @@ def seed_golden_queries():
                         {"q": q, "sql": sql, "vec": str(vector)}
                     )
                 conn.commit()
-                print("✅ Seeding Complete.")
+                print("Seeding Complete.")
         except Exception as e:
-            print(f"⚠️ Seed Error: {e}")
+            print(f"Seed Error: {e}")
 
 # Run seed on startup
 try:
     seed_golden_queries()
 except Exception as e:
-    print(f"⚠️ Vector Store Seed Failed: {e}")
+    print(f"Vector Store Seed Failed: {e}")
     if "vector" in str(e) and "does not exist" in str(e):
         print("   -> Hint: Please enable pgvector extension.")
     if "dimension" in str(e):
@@ -119,7 +131,7 @@ def get_similar_examples(question: str, k=2):
             examples_str += f"- Question: {q}\n  SQL: {sql}\n"
         return examples_str
     except Exception as e:
-        print(f"❌ Vector Search Error: {e}")
+        print(f"Vector Search Error: {e}")
         return ""
 
 def get_exact_match(question: str, threshold=0.05):
@@ -140,11 +152,11 @@ def get_exact_match(question: str, threshold=0.05):
             if row:
                 sql_query, score = row
                 if score < threshold:  # Match!
-                    print(f"🎯 Cache Hit! Score: {score}")
+                    print(f"Cache Hit! Score: {score}")
                     return sql_query
         return None
     except Exception as e:
-        print(f"❌ Cache Check Error: {e}")
+        print(f"Cache Check Error: {e}")
         return None
 
 def add_golden_query(question: str, sql_query: str):
@@ -157,20 +169,20 @@ def add_golden_query(question: str, sql_query: str):
             exists = conn.execute(check_stmt, {"q": question, "sql": sql_query}).scalar()
             
             if exists:
-                print(f"⚠️ Query knowledge already exists. Skipping duplicate.")
+                print(f"Query knowledge already exists. Skipping duplicate. (Q: '{question}', SQL: '{sql_query}')")
                 return True
 
             # 2. Add if new
+            print(f"Inserting new knowledge: '{question}'")
             vector = embeddings.embed_query(question)
             conn.execute(
                 text("INSERT INTO golden_queries (question, sql_query, embedding) VALUES (:q, :sql, :vec)"),
                 {"q": question, "sql": sql_query, "vec": str(vector)}
             )
             conn.commit()
-            print(f"✅ Learned new query: {question}")
         return True
     except Exception as e:
-        print(f"❌ Failed to add golden query: {e}")
+        print(f"Failed to add golden query: {e}")
         return False
 
 # ... (Agent Logic)
@@ -182,6 +194,15 @@ Unless the user specifies a specific number of examples, always limit your query
 Never query for all columns from a table. You must query only the columns that are needed to answer the question.
 Pay attention to use only the column names you can see in the schema description. Be careful to not query for columns that do not exist.
 Also, ensure the query is Read-Only.
+
+IMPORTANT: "customer_uuid" in the 'customer' table is a valid UUID type. However, other tables (like 'membership_account' and 'vehicle') use VARCHAR for foreign keys.
+When joining 'customer' with other tables, ALWAYS cast the UUID to text like this: `customer.customer_uuid::text = other_table.customer_id`.
+DO NOT cast the varchar column to UUID.
+
+DOMAIN KNOWLEDGE:
+- Active Membership: `membership_account.status = 1`
+- Active Vehicle: `vehicle.active = 1`
+- Cancelled Membership: `membership_account.status = -1` (or NOT 1)
 
 Only use the following tables:
 {table_info}
@@ -208,7 +229,7 @@ def get_sql_chain(question: str):
     response = llm.invoke(formatted_prompt)
     return response.content
 
-def process_user_question(question: str):
+async def process_user_question(question: str):
     """
     Returns a plan containing the generated SQL and an explanation.
     """
@@ -216,12 +237,16 @@ def process_user_question(question: str):
         # 0. Check Semantic Cache
         cached_sql = get_exact_match(question)
         if cached_sql:
+            await cache.track_hit(question)
             return {
                 "status": "success",
                 "type": "plan",
                 "sql": cached_sql,
                 "explanation": "I found an exact match in my memory! Here is the saved query."
             }
+        
+        # If we got here, it's a miss (for exact match)
+        await cache.track_miss(question)
 
         generated_sql = get_sql_chain(question)
         clean_sql = generated_sql.replace("```sql", "").replace("```", "").strip()
@@ -237,9 +262,9 @@ def process_user_question(question: str):
         if "RESOURCE_EXHAUSTED" in error_str or "429" in error_str:
             return {
                 "status": "error",
-                "message": "⚠️ AI Overload: The free tier quota has been exceeded. Please wait ~30 seconds and try again."
+                "message": "AI Overload: The free tier quota has been exceeded. Please wait ~30 seconds and try again."
             }
-        print(f"❌ AI Error: {e}")
+        print(f"AI Error: {e}")
         return {
             "status": "error",
             "message": f"AI Error: {str(e)}"

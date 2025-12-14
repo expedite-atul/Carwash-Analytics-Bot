@@ -5,16 +5,16 @@
 
     export const suggestions = [
         {
-            label: "💰 Monthly Revenue",
+            label: "Monthly Revenue",
             query: "What is the total revenue this month?",
         },
         {
-            label: "👥 Active Customers",
+            label: "Active Customers",
             query: "How many active customers do we have?",
         },
-        { label: "📉 Churn Rate", query: "Calculate the customer churn rate." },
+        { label: "Churn Rate", query: "Calculate the customer churn rate." },
         {
-            label: "🚿 Top Packages",
+            label: "Top Packages",
             query: "What are the most popular wash packages?",
         },
     ];

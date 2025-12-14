@@ -38,7 +38,7 @@
                             <h2
                                 class="text-lg font-semibold text-gray-200 tracking-tight"
                             >
-                                Analytics Dashboard
+                                Chat Interface
                             </h2>
                         </header>
                         <div

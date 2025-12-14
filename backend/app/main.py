@@ -20,7 +20,7 @@ async def lifespan(app: FastAPI):
         statement = select(User).where(User.role == UserRole.ADMIN)
         admin = session.exec(statement).first()
         if not admin:
-            print("🚀 Seeding Default Admin User...")
+            print("Seeding Default Admin User...")
             admin_user = User(
                 email="admin@carwash.com",
                 hashed_password=get_password_hash("password123"),
@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
             )
             session.add(admin_user)
             session.commit()
-            print("✅ Admin created: admin@carwash.com / password123")
+            print("Admin created: admin@carwash.com / password123")
             
     yield
 
@@ -120,7 +120,7 @@ async def create_plan(
     session.add(user_msg)
     
     # 3. Generate Plan
-    plan_response = process_user_question(request.message)
+    plan_response = await process_user_question(request.message)
     
     # 4. Save Bot Response
     meta = {}
@@ -189,11 +189,11 @@ async def execute_query(
         ).first()
 
         if last_user_msg:
-            print(f"🧠 Auto-Learning: Saving '{last_user_msg.content}' -> SQL")
+            print(f"Auto-Learning: Saving '{last_user_msg.content}' -> SQL")
             add_golden_query(last_user_msg.content, request.sql)
 
     return result_response
 
 @app.get("/")
 async def root():
-    return {"message": "Carwash Bot API v2 (Auth + Redis)"}
+    return {"message": "QuerySense Bot API v2 (Auth + Redis)"}

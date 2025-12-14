@@ -1,4 +1,4 @@
-# Carwash Analytics Chatbot 🚗💧
+# Carwash Analytics Chatbot
 
 A RAG-enhanced Business Intelligence bot that allows carwash owners to query their data using natural language. Built with **FastAPI**, **Svelte**, **PostgreSQL (pgvector)**, and **Google Gemini**.
 
@@ -6,7 +6,7 @@ A RAG-enhanced Business Intelligence bot that allows carwash owners to query the
 ![Python](https://img.shields.io/badge/python-3.10+-blue.svg)
 ![Svelte](https://img.shields.io/badge/svelte-5.0-orange.svg)
 
-## ✨ Features
+## Features
 *   **Natural Language to SQL**: Ask "How many active customers do we have?" and get real data.
 *   **Human-in-the-Loop**: The bot proposes a plan (SQL), and you approve it.
 *   **Smart Dashboard**: 
@@ -15,22 +15,21 @@ A RAG-enhanced Business Intelligence bot that allows carwash owners to query the
     *   **Suggestion Chips**: Quick shortcuts for common business questions.
 *   **Secure**: Runs with a Read-Only database user.
 
-## 🛠 Tech Stack
+## Tech Stack
 *   **Backend**: FastAPI, LangChain, Google Gemini 2.5 Flash
 *   **Frontend**: Svelte 5, TailwindCSS
 *   **Database**: PostgreSQL 16 + `pgvector`
 *   **Infrastructure**: Docker Compose
 
-## 🚀 Getting Started
-
-### 📋 Prerequisites
+## Getting Started
+### Prerequisites
 Before you begin, ensure you have the following installed:
 1.  **Docker & Docker Compose**: For running the database.
 2.  **Node.js (v18+) & npm**: For the Svelte frontend.
 3.  **Python (v3.10+)**: For the FastAPI backend.
 4.  **Google Gemini API Key**: (Optional, if using Cloud LLM).
 
-### ⚙️ Installation & Running
+### Installation & Running
 
 #### 1. Database Setup
 Start the local PostgreSQL instance with pgvector.
@@ -81,7 +80,7 @@ Open your browser and visit **`http://localhost:5173`**.
 
 ---
 
-## 🔧 Configuration (.env)
+## Configuration (.env)
 You can configure the AI providers in `backend/.env`:
 
 | Variable | Options | Description |
@@ -90,7 +89,7 @@ You can configure the AI providers in `backend/.env`:
 | `EMBEDDING_PROVIDER` | `local`, `google` | The Memory. Use `local` for free, private embeddings. |
 
 
-## 🧠 Architecture (RAG Flow)
+## Architecture (RAG Flow)
 This system uses a **Provider-Agnostic** design. By default, it uses **Local Embeddings** (Free/Fast) and **Gemini Flash** (Smart/Cheap).
 
 ```mermaid
@@ -144,7 +143,7 @@ sequenceDiagram
     end
 ```
 
-## 🛠 Tech Stack
+## Tech Stack
 *   **Backend**: FastAPI, LangChain
 *   **LLM Provider**: Google Gemini 2.5 Flash (Pluggable)
 *   **Memory/Embeddings**: **Local HuggingFace** (`all-MiniLM-L6-v2`) or Google API.
@@ -152,5 +151,5 @@ sequenceDiagram
 *   **Frontend**: Svelte 5, TailwindCSS
 
 
-## 📝 License
+## License
 MIT

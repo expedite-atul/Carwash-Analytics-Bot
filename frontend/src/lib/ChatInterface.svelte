@@ -8,7 +8,7 @@
     {
       role: "bot",
       content:
-        "Hello! I'm your Analytics Assistant. Ask me about revenue, customers, or churn.",
+        "Hello! I'm Query Sense Bot. Ask me about revenue, customers, vehicles or memberships.",
     },
   ];
   let input = "";
@@ -151,7 +151,7 @@
       });
 
       if (res.ok) {
-        alert("Thanks! Feedback saved. 🧠");
+        alert("Thanks! Feedback saved.");
       } else {
         console.error("Feedback failed");
       }
@@ -238,7 +238,15 @@
       <p
         class="text-[10px] items-center justify-center text-muted/60 uppercase tracking-widest font-semibold flex gap-1"
       >
-        <span>Powered by Gemini 2.5</span>
+        <span>
+          Designed & Built by <a
+            href="https://github.com/expedite-atul/"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="hover:text-primary transition-colors cursor-pointer border-b border-transparent hover:border-primary"
+            >Atul Singh</a
+          >
+        </span>
       </p>
     </div>
   </div>

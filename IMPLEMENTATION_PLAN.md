@@ -1,13 +1,13 @@
 # Carwash Analytics Bot - Implementation Plan
 
-## 🎯 Goal
+## Goal
 Transform the MVP into a scalable, secure, and modern Business Intelligence application with Role-Based Access Control (RBAC), high-performance caching (Redis), and comprehensive administration capabilities.
 
-## 🏗 Architecture (Phase 2)
+## Architecture (Phase 2)
 *   **Frontend**: Svelte 5 + TailwindCSS + Vite (Single Page App with Routing)
 *   **Backend**: FastAPI (Python 3.10+)
 
-## 🚀 Roadmap & TODOs
+## Roadmap & TODOs
 ### Phase 2: RAG & Memory (In Progress)
 The `pgvector` infrastructure is ready. The next step is to enable "Memory" so the bot learns from correct queries.
 - [ ] **Golden Query Seeder**: Populate `golden_queries` table with vetted Q&A pairs.

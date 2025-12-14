@@ -2,7 +2,7 @@
 
 This document details the internal logic of the **Carwash Analytics Chatbot**. The system uses a **3-Layer Search Architecture** to balance Speed, Accuracy, and Cost.
 
-## 🧠 Core Logic: The 3 Layers
+## Core Logic: The 3 Layers
 
 When a user asks a question, the backend follows this waterfall logic:
 
@@ -14,7 +14,7 @@ When a user asks a question, the backend follows this waterfall logic:
 
 ---
 
-## 🔄 Detailed Sequence Diagram
+## Detailed Sequence Diagram
 
 ```mermaid
 sequenceDiagram
@@ -64,7 +64,7 @@ sequenceDiagram
     A-->>User: Return Results (Data/Chart)
 ```
 
-## 💎 Deep Dive: The `golden_queries` Table
+## Deep Dive: The `golden_queries` Table
 
 This table is the **Long-Term Memory** of the chatbot. It doesn't just store text; it stores the *meaning* of the text.
 
@@ -76,7 +76,7 @@ This table is the **Long-Term Memory** of the chatbot. It doesn't just store tex
 | `sql_query` | `TEXT` | The verified SQL answer. |
 | `embedding` | `vector(384)` | **The Magic Column**. A list of 384 numbers representing the semantic meaning. |
 
-### 🧠 How Embeddings Work
+### How Embeddings Work
 The `embedding` column is not random. It is generated using a **Sentence Transformer** model (specifically `all-MiniLM-L6-v2`).
 
 1.  **Input**: "How many customers?"
@@ -86,11 +86,11 @@ The `embedding` column is not random. It is generated using a **Sentence Transfo
 **Why do this?**
 Computers cannot compare text strings effectively.
 - String Match: "Active users" != "Users who are active" (0% match).
-- **Vector Match**: "Active users" ≈ "Users who are active" (**98% match**).
+- **Vector Match**: "Active users" ~= "Users who are active" (**98% match**).
 
 By converting text to numbers (Vectors), we can use math (Cosine Distance) to find questions that *mean* the same thing, even if they are typed differently.
 
-### 🚀 Benefits
+### Benefits
 
 1.  **Semantic Caching (Speed)**
     - If a user asks "Total revenue?", and we have "What is the total income?" in the DB.
@@ -108,7 +108,7 @@ By converting text to numbers (Vectors), we can use math (Cosine Distance) to fi
     - Calling an LLM costs credits.
     - By hitting the cache, you save money on every repeated query.
 
-## 🛠 Data Flow Algorithm
+## Data Flow Algorithm
 
 ### 1. `POST /chat/plan`
 1.  **Input**: User Message string.

@@ -35,6 +35,20 @@ class CacheService:
             value = json.dumps(value)
         await self.redis.set(key, value, ex=ttl)
 
+    async def track_hit(self, key: str):
+        """Manually track a cache hit (e.g. from pgvector)."""
+        await self.redis.hincrby(self.stats_key, "hits", 1)
+        timestamp = datetime.utcnow().isoformat()
+        await self.redis.lpush("cache:logs", json.dumps({"key": key, "type": "HIT", "time": timestamp}))
+        await self.redis.ltrim("cache:logs", 0, 49)
+
+    async def track_miss(self, key: str):
+        """Manually track a cache miss."""
+        await self.redis.hincrby(self.stats_key, "misses", 1)
+        timestamp = datetime.utcnow().isoformat()
+        await self.redis.lpush("cache:logs", json.dumps({"key": key, "type": "MISS", "time": timestamp}))
+        await self.redis.ltrim("cache:logs", 0, 49)
+
     async def get_stats(self) -> dict:
         stats = await self.redis.hgetall(self.stats_key)
         logs = await self.redis.lrange("cache:logs", 0, -1)

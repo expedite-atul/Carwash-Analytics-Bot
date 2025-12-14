@@ -104,7 +104,7 @@
                             on:click={() => dispatch("proceed", message.sql)}
                             class="w-full py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"
                         >
-                            <span>🚀 Proceed</span>
+                            <span>Proceed</span>
                         </button>
                     </div>
 
@@ -124,9 +124,7 @@
                             on:click={() => (showSql = !showSql)}
                             class="text-xs text-muted flex items-center gap-1 hover:text-primary transition-colors w-full"
                         >
-                            <span
-                                >{showSql ? "🔽" : "✨"} Calculation Logic</span
-                            >
+                            <span>{showSql ? "" : ""} Calculation Logic</span>
                         </button>
                         {#if showSql}
                             <div
@@ -150,7 +148,7 @@
                             class="text-xs flex items-center gap-1 text-gray-400 hover:text-green-600 transition-colors"
                             title="Help me learn! Mark this as a good answer."
                         >
-                            👍 Great Answer
+                            Great Answer
                         </button>
                     </div>
                 {/if}
