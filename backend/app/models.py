@@ -21,7 +21,7 @@ class User(SQLModel, table=True):
 
 class ChatSession(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: Optional[int] = Field(default=None, foreign_key="user.id")
+    user_id: Optional[int] = Field(default=None, foreign_key="user.id", index=True)
     title: str = Field(default="New Chat")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
@@ -30,10 +30,21 @@ class ChatSession(SQLModel, table=True):
 
 class ChatMessage(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    session_id: int = Field(foreign_key="chatsession.id")
+    session_id: int = Field(foreign_key="chatsession.id", index=True)
     role: str # "user" or "bot"
     content: str
     meta_info: Optional[str] = None # JSON string for extra data (SQL queries, etc.)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     
     session: ChatSession = Relationship(back_populates="messages")
+
+from pgvector.sqlalchemy import Vector
+from sqlalchemy import Column
+
+class GoldenQuery(SQLModel, table=True):
+    __tablename__ = "golden_queries"
+    
+    id: Optional[int] = Field(default=None, primary_key=True)
+    question: str
+    sql_query: str
+    embedding: List[float] = Field(sa_column=Column(Vector(384)))

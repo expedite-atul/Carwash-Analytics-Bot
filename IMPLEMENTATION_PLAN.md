@@ -8,11 +8,16 @@ Transform the MVP into a scalable, secure, and modern Business Intelligence appl
 *   **Backend**: FastAPI (Python 3.10+)
 
 ## Roadmap & TODOs
-### Phase 2: RAG & Memory (In Progress)
-The `pgvector` infrastructure is ready. The next step is to enable "Memory" so the bot learns from correct queries.
-- [ ] **Golden Query Seeder**: Populate `golden_queries` table with vetted Q&A pairs.
-- [ ] **Vector Search**: Implement cosine similarity search to inject "Similar Past Queries" into the prompt.
-    - *Note: Base logic is implemented in `agent.py`, pending API Rate Limit resolution for seeding.*
+### Phase 2: RAG & Memory (Completed)
+The `pgvector` infrastructure is mature and fully integrated.
+- [x] **Golden Query Seeder**: Populates `golden_queries` table ensuring vectors are ready on startup.
+- [x] **Vector Search**: RAG implementation active in `agent.py` using `sqlmodel`.
+- [x] **Context Awareness**: Multi-turn conversation support via history injection.
+
+### Phase 2.5: Stability & Performance (Completed)
+- [x] **Frontend Resilience**: Unique UUIDs for messages and robust Chart fallback logic.
+- [x] **Backend Optimization**: Database Indexes + Limit 50 on History Fetch.
+- [x] **Performance Logging**: Granular timing logs for per-request latency analysis.
 
 ### Phase 3: Advanced Analytics
 - [ ] **Multi-Table Joins**: Expand schema pruning to include `transactions`, `wash_packages`, and `employees`.
